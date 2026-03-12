@@ -1,0 +1,15 @@
+
+🛡️  DMIS India Backend
+📡 Server running on http://localhost:3000
+   API docs:
+     GET  /api/shelters         — List shelters
+     GET  /api/shelters/stats    — Shelter stats
+     GET  /api/shelters/:id      — Single shelter
+     PUT  /api/shelters/:id      — Update shelter
+     GET  /api/incidents         — List incidents
+     POST /api/incidents         — Report incident
+     GET  /api/alerts            — List alerts
+     POST /api/alerts            — Create alert
+     POST /api/sos               — Trigger SOS
+     GET  /api/health            — Health check
+

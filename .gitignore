@@ -1,0 +1,4 @@
+node_modules
+.env
+dmis.db
+.DS_Store
