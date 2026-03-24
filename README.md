@@ -1,13 +1,23 @@
-# DMIS - Disaster Management System
+# DMIS
 
-This is a web-based disaster management system project.
+A web-based system to manage and track disaster-related data efficiently.
 
-## Features
+## 🚀 Features
 - User management
 - Disaster tracking
-- Data storage using database
+- Database integration
 
-## Tech Stack
+## 🛠 Tech Stack
 - HTML
 - JavaScript
 - Node.js
+
+## 📁 Project Structure
+- routes/ → API routes
+- maps/ → mapping features
+- server.js → backend entry point
+
+## ⚡ How to Run
+```bash
+npm install
+node server.js
