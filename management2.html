@@ -3778,7 +3778,7 @@
                     const origin = window.location.origin;
                     // If opened via file:// or a non-Express server (e.g. VS Code Live Server on 5500),
                     // fallback to the Express API server on port 3000
-                    if (!origin || origin === 'null' || origin === 'file://' || window.location.port !== '3000') {
+                    if (!origin || origin === 'null' || origin === 'file://') {
                         console.info('📡 DMIS: Not served by Express — using http://localhost:3000 for API');
                         return 'http://localhost:3000';
                     }
@@ -4012,8 +4012,8 @@
                 async function initMap() {
                     map = L.map('map').setView([20.5937, 78.9629], 5);
 
-                    L.tileLayer('https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png', {
-                        attribution: '&copy; <a href="https://stadiamaps.com/">Stadia Maps</a> &copy; <a href="https://openmaptiles.org/">OpenMapTiles</a> &copy; <a href="https://openstreetmap.org">OpenStreetMap</a>',
+                    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                        attribution: '&copy; <a href="https://carto.com/">CARTO</a> &copy; <a href="https://openstreetmap.org">OpenStreetMap</a>',
                         maxZoom: 20
                     }).addTo(map);
 
