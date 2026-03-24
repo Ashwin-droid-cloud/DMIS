@@ -3906,43 +3906,49 @@
                 }
 
                 async function loadAlerts() {
-                    const alerts = await apiFetch('/api/alerts');
-                    const alertFeed = document.getElementById('alertFeed');
-                    alertFeed.innerHTML = '';
+                    try {
+                        const alerts = await apiFetch('/api/alerts');
+                        const alertFeed = document.getElementById('alertFeed');
+                        alertFeed.innerHTML = '';
 
-                    alerts.forEach(alert => {
-                        const alertClass = alert.type === 'critical' ? 'alert-critical' :
-                            alert.type === 'warning' ? 'alert-warning' : 'alert-info';
-                        const timeAgo = getTimeAgo(alert.createdAt);
-                        const cred = computeAlertCredibility(alert);
-                        const credLevel = cred >= 75 ? 'high' : cred >= 45 ? 'medium' : 'low';
-                        const credLabel = cred >= 75 ? 'Verified' : cred >= 45 ? 'Plausible' : 'Unverified';
-                        const alertHTML = `
-                    <div class="alert-item ${alertClass}">
-                        <div class="alert-header">
-                            <div class="alert-title">${alert.title}</div>
-                            <div class="alert-time">${timeAgo}</div>
+                        alerts.forEach(alert => {
+                            const alertClass = alert.type === 'critical' ? 'alert-critical' :
+                                alert.type === 'warning' ? 'alert-warning' : 'alert-info';
+                            const timeAgo = getTimeAgo(alert.createdAt);
+                            const cred = computeAlertCredibility(alert);
+                            const credLevel = cred >= 75 ? 'high' : cred >= 45 ? 'medium' : 'low';
+                            const credLabel = cred >= 75 ? 'Verified' : cred >= 45 ? 'Plausible' : 'Unverified';
+                            const alertHTML = `
+                        <div class="alert-item ${alertClass}">
+                            <div class="alert-header">
+                                <div class="alert-title">${alert.title}</div>
+                                <div class="alert-time">${timeAgo}</div>
+                            </div>
+                            <div class="alert-description">${alert.description}</div>
+                            ${alert.location ? `<div class="alert-location">📍 ${alert.location}</div>` : ''}
+                            <div class="alert-credibility">
+                                <div class="alert-cred-header">
+                                    <div class="alert-cred-label">Credibility</div>
+                                    <div class="alert-cred-badge ${credLevel}">${credLabel} ${cred}%</div>
+                                </div>
+                                <div class="alert-cred-bar">
+                                    <div class="alert-cred-fill ${credLevel}" style="width:${cred}%"></div>
+                                </div>
+                                <div class="alert-cred-scale">
+                                    <span>Low</span>
+                                    <span>Medium</span>
+                                    <span>High</span>
+                                </div>
+                            </div>
                         </div>
-                        <div class="alert-description">${alert.description}</div>
-                        ${alert.location ? `<div class="alert-location">📍 ${alert.location}</div>` : ''}
-                        <div class="alert-credibility">
-                            <div class="alert-cred-header">
-                                <div class="alert-cred-label">Credibility</div>
-                                <div class="alert-cred-badge ${credLevel}">${credLabel} ${cred}%</div>
-                            </div>
-                            <div class="alert-cred-bar">
-                                <div class="alert-cred-fill ${credLevel}" style="width:${cred}%"></div>
-                            </div>
-                            <div class="alert-cred-scale">
-                                <span>Low</span>
-                                <span>Medium</span>
-                                <span>High</span>
-                            </div>
-                        </div>
-                    </div>
-                `;
-                        alertFeed.insertAdjacentHTML('beforeend', alertHTML);
-                    });
+                    `;
+                            alertFeed.insertAdjacentHTML('beforeend', alertHTML);
+                        });
+                    } catch (err) {
+                        console.warn('Alerts load error:', err);
+                        document.getElementById('alertFeed').innerHTML = 
+                            '<div class="alert-item alert-info" style="padding: 12px; text-align: center;"><div class="alert-description">Live alerts temporarily unavailable.</div></div>';
+                    }
                 }
 
                 // Compute credibility score for an alert (0-100)
@@ -4012,8 +4018,12 @@
                     }).addTo(map);
 
                     // Load shelters from API then add to map
-                    await loadShelters();
-                    addSheltersToMap();
+                    try {
+                        await loadShelters();
+                        addSheltersToMap();
+                    } catch (err) {
+                        console.warn('Map shelters load error:', err);
+                    }
 
                     // Use cached geolocation — no repeated prompts
                     getCachedPosition().then(position => {
@@ -4027,9 +4037,65 @@
                         userMarker = L.marker([userLat, userLng], { icon: userIcon })
                             .addTo(map)
                             .bindPopup('<b>Your Location</b>');
+
+                        // After getting location, populate nearby shelters list
+                        populateNearbyShelters(userLat, userLng);
                     }).catch(err => {
                         console.warn('📍 Location fallback used or failed:', err);
+                        
+                        // Populate based on default New Delhi fallback location if no custom location is allowed
+                        populateNearbyShelters(28.6139, 77.2090);
                     });
+                }
+
+                function populateNearbyShelters(lat, lng) {
+                    if (!shelters || shelters.length === 0) return;
+
+                    // Calculate distance to all shelters
+                    const withDistances = shelters.map(s => {
+                        return { 
+                            ...s, 
+                            distance: getDistance(lat, lng, s.lat, s.lng) 
+                        };
+                    });
+
+                    // Sort by distance
+                    withDistances.sort((a, b) => a.distance - b.distance);
+
+                    // Take closest 5
+                    const closest = withDistances.slice(0, 5);
+                    const shelterList = document.getElementById('shelterList');
+                    shelterList.innerHTML = '';
+
+                    closest.forEach(s => {
+                        const distanceKm = (s.distance / 1000).toFixed(1);
+                        const isAvailable = s.currentOccupancy < s.capacity;
+                        const statusClass = isAvailable ? 'status-green' : 'status-red';
+                        const statusText = isAvailable ? 'Available' : 'Full';
+
+                        const itemHTML = `
+                            <div class="shelter-list-item" style="cursor: pointer; padding: 12px; border-bottom: 1px solid var(--border); transition: background 0.2s; display: flex; justify-content: space-between; align-items: flex-start;" onclick="focusShelter(${s.id}); map.setView([${s.lat}, ${s.lng}], 15);">
+                                <div>
+                                    <div style="font-weight: 600; font-size: 0.9rem; margin-bottom: 4px; color: var(--text-primary);">${s.name}</div>
+                                    <div style="font-size: 0.75rem; color: var(--text-muted); display: flex; align-items: center; gap: 4px;">
+                                        <span>📍 ${distanceKm} km away</span>
+                                        <span>•</span>
+                                        <span class="${statusClass}" style="font-size: 0.7rem; padding: 2px 6px; border-radius: 4px;">${statusText}</span>
+                                    </div>
+                                </div>
+                                <div style="font-size: 1.2rem; align-self: center; cursor: pointer;">🧭</div>
+                            </div>
+                        `;
+                        shelterList.insertAdjacentHTML('beforeend', itemHTML);
+                    });
+                    
+                    // Add simple hover effect via CSS injection since inline hover is hard
+                    if (!document.getElementById('shelter-hover-style')) {
+                        const style = document.createElement('style');
+                        style.id = 'shelter-hover-style';
+                        style.innerHTML = '.shelter-list-item:hover { background: var(--dark-3); border-radius: 8px; }';
+                        document.head.appendChild(style);
+                    }
                 }
 
                 function addSheltersToMap() {
@@ -4890,27 +4956,32 @@
                 document.addEventListener('DOMContentLoaded', async () => {
                     const loader = document.getElementById('appLoader');
 
-                    // Initialize the map container first
-                    await initMap();
+                    try {
+                        // Initialize the map container first
+                        await initMap();
 
-                    // Fetch all data sources concurrently for faster startup
-                    await Promise.all([
-                        loadStats(),
-                        loadAlerts(),
-                        loadPredictions(),
-                        loadMapIntelligence()
-                    ]);
+                        // Fetch all data sources concurrently for faster startup
+                        await Promise.all([
+                            loadStats(),
+                            loadAlerts(),
+                            loadPredictions(),
+                            loadMapIntelligence()
+                        ]);
 
-                    // Hide interactive loader overlay
-                    if (loader) loader.classList.add('hidden');
+                        setTimeout(() => showToast('Welcome to DMIS India', 'Real-time disaster management and emergency response system', 'success'), 1000);
+                        setTimeout(async () => {
+                            await generateWeatherAlerts();
+                        }, 3000);
+                    } catch (err) {
+                        console.error('Initialization error:', err);
+                        showToast('Connection Error', 'Some live data streams are temporarily unavailable. Operating in degraded mode.', 'warning');
+                    } finally {
+                        // Hide interactive loader overlay
+                        if (loader) loader.classList.add('hidden');
+                    }
 
                     setInterval(loadPredictions, 60000); // Refresh predictions every 60s
                     setInterval(loadMapIntelligence, 30000); // refresh every 30s
-
-                    setTimeout(() => showToast('Welcome to DMIS India', 'Real-time disaster management and emergency response system', 'success'), 1000);
-                    setTimeout(async () => {
-                        await generateWeatherAlerts();
-                    }, 3000);
                 });
 
                 // ─── MAP INTELLIGENCE PANEL ─────────────────────────────

@@ -38,14 +38,29 @@ async function seed() {
     console.log('🌱 Seeding database...');
     await initDb();
 
-    execute('DELETE FROM shelters');
-    execute('DELETE FROM alerts');
-    execute('DELETE FROM incidents');
+    await execute('TRUNCATE TABLE shelters CASCADE');
+    await execute('TRUNCATE TABLE alerts CASCADE');
+    await execute('TRUNCATE TABLE incidents CASCADE');
+
+    const insertShelterSql = `
+        INSERT INTO shelters (id, name, lat, lng, capacity, currentOccupancy, facilities, contactPerson, phone, address, city)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        ON CONFLICT (id) DO UPDATE SET
+            name = EXCLUDED.name,
+            lat = EXCLUDED.lat,
+            lng = EXCLUDED.lng,
+            capacity = EXCLUDED.capacity,
+            currentOccupancy = EXCLUDED.currentOccupancy,
+            facilities = EXCLUDED.facilities,
+            contactPerson = EXCLUDED.contactPerson,
+            phone = EXCLUDED.phone,
+            address = EXCLUDED.address,
+            city = EXCLUDED.city
+    `;
 
     for (const s of shelters) {
-        execute(
-            `INSERT OR REPLACE INTO shelters (id, name, lat, lng, capacity, currentOccupancy, facilities, contactPerson, phone, address, city)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        await execute(
+            insertShelterSql,
             [s.id, s.name, s.lat, s.lng, s.capacity, s.currentOccupancy,
             JSON.stringify(s.facilities), s.contactPerson, s.phone, s.address, s.city]
         );
@@ -53,8 +68,8 @@ async function seed() {
     console.log(`  ✅ Inserted ${shelters.length} shelters`);
 
     for (const a of defaultAlerts) {
-        insert(
-            `INSERT INTO alerts (type, title, description, location) VALUES (?, ?, ?, ?)`,
+        await insert(
+            `INSERT INTO alerts (type, title, description, location) VALUES ($1, $2, $3, $4)`,
             [a.type, a.title, a.description, a.location]
         );
     }
@@ -62,7 +77,7 @@ async function seed() {
     console.log('🎉 Database seeded successfully!');
 }
 
-seed().catch(err => {
+seed().then(() => process.exit(0)).catch(err => {
     console.error('Seed failed:', err);
     process.exit(1);
 });
